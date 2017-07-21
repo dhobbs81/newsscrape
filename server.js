@@ -38,9 +38,8 @@ var exphbs = require("express-handlebars");
 app.engine("handlebars", exphbs({ defaultLayout: "main" }));
 app.set("view engine", "handlebars");
 
-var mongoConnect = 
-  process.env.MONGODB_URI || 
-  "mongodb://localhost/week18day3mongoose";
+// Get the mongoDB connection string from environment
+var mongoConnect = process.env.MONGODB_URI;
 
 // Database configuration with mongoose
 mongoose.connect(mongoConnect);
@@ -66,13 +65,13 @@ app.get("/", function(request, response) {
 
 // A GET request to scrape the echojs website
 app.get("/scrape", function(req, res) {
-  
+
   // First, we grab the body of the html with request
   request("http://www.echojs.com/", function(error, response, html) {
-    
+
     // Then, we load that into cheerio and save it to $ for a shorthand selector
     var $ = cheerio.load(html);
-    
+
     // Now, we grab every h2 within an article tag, and do the following:
     $("article h2").each(function(i, element) {
 
@@ -122,16 +121,21 @@ app.get("/articles", function(req, res) {
 // This will grab an article by it's ObjectId
 app.get("/articles/:id", function(req, res) {
 
-
   // TODO
   // ====
 
   // Finish the route so it finds one article using the req.params.id,
-
   // and run the populate method with "note",
-
   // then responds with the article with the note included
 
+  // Find the article by ID, populate the note
+  Article.findOne( { "_id" : req.params.id }).
+    populate("note").
+    exec(function (err, article) {
+        if (err) return console.log(err);
+        res.send(article);
+        console.log(article);
+    });
 
 });
 
@@ -141,16 +145,34 @@ app.post("/articles/:id", function(req, res) {
 
   // TODO
   // ====
+  const note = new Note(
+    {
+      "title" : "This is a new note",
+      "body"  : "lorem ipsum"
+    }
+  );
 
   // save the new note that gets posted to the Notes collection
+  note.save(function(err) {
+    // we've saved the dog into the db here
+    if (err) console.log(err);
 
-  // then find an article from the req.params.id
+    // Find the article by ID, populate the note
+    // and update it's "note" property with the _id of the new note
+    Article.findOne( { "_id" : req.params.id }).
+      populate("note").
+      exec(function (err, article) {
+          if (err) return console.log(err);
 
-  // and update it's "note" property with the _id of the new note
-
+          article.note = { type: note.id, ref: "Note" };
+          article.save()
+          article.populate("note");
+          res.send(article);
+          console.log(article);
+      });
+  });
 
 });
-
 
 // Listen on port 3000
 app.listen(3000, function() {
